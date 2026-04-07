@@ -3,10 +3,10 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=Limfjordssekretariatet tools v.3.12
+name=Limfjordssekretariatet tools v.4
 qgisMinimumVersion=3.0
 description=Limfjordssekretariatet forskellige tools
-version=0.1
+version=4.0
 author=Henrik Rosenskjold, Limfjordssekretariatet
 email=henrik.rosenskjold@aalborg.dk
 
