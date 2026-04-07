@@ -1,0 +1,20 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<plugins>
+  <pyqgis_plugin name="Limfjordssekretariatet tools v.4.0.1" version="4.0.1">
+    <description>Limfjordssekretariatet forskellige tools</description>
+    <about>Tools til Limfjordssekretariatet</about>
+    <version>4.0.1</version>
+    <qgis_minimum_version>3.0</qgis_minimum_version>
+    <homepage>https://github.com/hrosenskjold/limf-qgis-plugin</homepage>
+    <file_name>limf_tools.zip</file_name>
+    <icon>icon.png</icon>
+    <author_name>Henrik Rosenskjold, Limfjordssekretariatet</author_name>
+    <download_url>https://hrosenskjold.github.io/limf-qgis-plugin/limf_tools.zip</download_url>
+    <experimental>False</experimental>
+    <deprecated>False</deprecated>
+    <tracker>https://github.com/hrosenskjold/limf-qgis-plugin/issues</tracker>
+    <repository>https://github.com/hrosenskjold/limf-qgis-plugin</repository>
+    <tags>python</tags>
+    <server>False</server>
+  </pyqgis_plugin>
+</plugins>
