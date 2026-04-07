@@ -38,12 +38,13 @@ jobs:
                           return line.split('=', 1)[1].strip()
               return ''
 
-          version  = get_meta('version')
-          name     = get_meta('name')
-          desc     = get_meta('description')
-          about    = get_meta('about')
-          qgis_min = get_meta('qgisMinimumVersion')
-          author   = get_meta('author')
+          version      = get_meta('version')
+          name         = get_meta('name')
+          desc         = get_meta('description')
+          about        = get_meta('about')
+          qgis_min     = get_meta('qgisMinimumVersion')
+          author       = get_meta('author')
+          experimental = get_meta('experimental')
           repo     = os.environ['GITHUB_REPOSITORY']
           pages    = os.environ['PAGES_URL']
 
@@ -60,7 +61,7 @@ jobs:
               f'    <icon>icon.png</icon>\n'
               f'    <author_name>{author}</author_name>\n'
               f'    <download_url>{pages}/limf_tools.zip</download_url>\n'
-              f'    <experimental>True</experimental>\n'
+              f'    <experimental>{experimental}</experimental>\n'
               f'    <deprecated>False</deprecated>\n'
               f'    <tracker>https://github.com/{repo}/issues</tracker>\n'
               f'    <repository>https://github.com/{repo}</repository>\n'
