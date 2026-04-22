@@ -5,6 +5,7 @@ from qgis.core import (
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterNumber,
     QgsProcessingMultiStepFeedback,
+    QgsProcessingUtils,
     QgsCoordinateReferenceSystem,
     QgsProcessing,
     QgsWkbTypes,
@@ -69,7 +70,20 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 1. Opret grid over projektgrænse
+        # 1. Buffer hele input-polygonen
+        proj_buffered = processing.run('native:buffer', {
+            'INPUT': input_25832,
+            'DISTANCE': buffer_dist,
+            'SEGMENTS': 5,
+            'DISSOLVE': True,
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
+
+        feedback.setCurrentStep(2)
+        if feedback.isCanceled():
+            return {}
+
+        # 2. Opret grid over input-polygonens udstrækning
         grid = processing.run('qgis:creategrid', {
             'TYPE': 2,
             'EXTENT': input_25832,
@@ -79,26 +93,13 @@ class GridTilLER(QgsProcessingAlgorithm):
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        feedback.setCurrentStep(2)
-        if feedback.isCanceled():
-            return {}
-
-        # 2. Buffer projektgrænse fuldt
-        proj_buffered = processing.run('native:buffer', {
-            'INPUT': input_25832,
-            'DISTANCE': buffer_dist,
-            'SEGMENTS': 5,
-            'DISSOLVE': True,
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
-
         feedback.setCurrentStep(3)
         if feedback.isCanceled():
             return {}
 
-        # Fratræk original → kun ydre ring (svarende til OUTSIDE_ONLY)
-        proj_outer = processing.run('native:difference', {
-            'INPUT': proj_buffered,
+        # 3. Klip grid til input-polygonen (behold kun celler inden for projektgrænsen)
+        grid_clipped = processing.run('native:clip', {
+            'INPUT': grid,
             'OVERLAY': input_25832,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
@@ -107,12 +108,12 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 3. Buffer grid, dissolve alt til ét polygon
+        # 4. Buffer hver grid-celle individuelt (dissolve=False → individuelle features)
         grid_buffered = processing.run('native:buffer', {
-            'INPUT': grid,
+            'INPUT': grid_clipped,
             'DISTANCE': buffer_dist,
             'SEGMENTS': 5,
-            'DISSOLVE': True,
+            'DISSOLVE': False,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
@@ -120,10 +121,10 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 4. Klip grid-buffer til projektgrænse
-        grid_clipped = processing.run('native:clip', {
-            'INPUT': grid_buffered,
-            'OVERLAY': input_25832,
+        # 5. Merge: bufferet projektgrænse + individuelle bufferede grid-celler
+        merged = processing.run('native:mergevectorlayers', {
+            'LAYERS': [proj_buffered, grid_buffered],
+            'CRS': crs,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
@@ -131,24 +132,14 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 5. Merge ydre ring + klippet grid
-        merged = processing.run('native:mergevectorlayers', {
-            'LAYERS': [proj_outer, grid_clipped],
-            'CRS': crs,
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
-
-        feedback.setCurrentStep(7)
-        if feedback.isCanceled():
-            return {}
-
-        # 6. Opdel multipart til single parts
+        # 6. Opdel eventuelle multipart-geometrier til single parts
         result_id = processing.run('native:multiparttosingleparts', {
             'INPUT': merged,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        from qgis.core import QgsProcessingUtils
+        feedback.setCurrentStep(7)
+
         result = QgsProcessingUtils.mapLayerFromString(result_id, context)
 
         (sink, dest_id) = self.parameterAsSink(
