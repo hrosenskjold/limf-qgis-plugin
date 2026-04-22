@@ -56,12 +56,21 @@ class GridTilLER(QgsProcessingAlgorithm):
         buffer_dist = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
         crs = QgsCoordinateReferenceSystem('EPSG:25832')
 
+        feedback.setProgressText('Reprojecterer inputlag til EPSG:25832...')
+
+        # Reprojectér input til EPSG:25832 så buffer-afstand altid er i meter
+        input_25832 = processing.run('native:reprojectlayer', {
+            'INPUT': parameters[self.INPUT],
+            'TARGET_CRS': crs,
+            'OUTPUT': 'memory:'
+        }, context=context, feedback=feedback)['OUTPUT']
+
         feedback.setProgressText('Opretter grid...')
 
         # 1. Opret grid over projektgrænse
         grid = processing.run('qgis:creategrid', {
             'TYPE': 2,
-            'EXTENT': parameters[self.INPUT],
+            'EXTENT': input_25832,
             'HSPACING': cell_width,
             'VSPACING': cell_height,
             'CRS': crs,
@@ -72,7 +81,7 @@ class GridTilLER(QgsProcessingAlgorithm):
 
         # 2. Buffer projektgrænse fuldt, fratræk original → kun ydre ring (svarende til OUTSIDE_ONLY)
         proj_buffered = processing.run('native:buffer', {
-            'INPUT': parameters[self.INPUT],
+            'INPUT': input_25832,
             'DISTANCE': buffer_dist,
             'SEGMENTS': 5,
             'DISSOLVE': True,
@@ -81,7 +90,7 @@ class GridTilLER(QgsProcessingAlgorithm):
 
         proj_outer = processing.run('native:difference', {
             'INPUT': proj_buffered,
-            'OVERLAY': parameters[self.INPUT],
+            'OVERLAY': input_25832,
             'OUTPUT': 'memory:'
         }, context=context, feedback=feedback)['OUTPUT']
 
@@ -99,7 +108,7 @@ class GridTilLER(QgsProcessingAlgorithm):
         # 4. Klip grid-buffer til projektgrænse
         grid_clipped = processing.run('native:clip', {
             'INPUT': grid_buffered,
-            'OVERLAY': parameters[self.INPUT],
+            'OVERLAY': input_25832,
             'OUTPUT': 'memory:'
         }, context=context, feedback=feedback)['OUTPUT']
 
