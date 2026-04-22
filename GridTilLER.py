@@ -59,7 +59,7 @@ class GridTilLER(QgsProcessingAlgorithm):
         buffer_dist = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
         crs = QgsCoordinateReferenceSystem('EPSG:25832')
 
-        # 0. Reprojectér input til EPSG:25832 så alle afstande er i meter
+        # 0. Reprojectér input til EPSG:25832
         input_25832 = processing.run('native:reprojectlayer', {
             'INPUT': parameters[self.INPUT],
             'TARGET_CRS': crs,
@@ -70,12 +70,18 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 1. Buffer hele input-polygonen
-        proj_buffered = processing.run('native:buffer', {
+        # 1. Konvertér projektgrænse-polygon til linje og buffer den
+        #    → giver en smal strip langs projektgrænsens yderkant
+        boundary_line = processing.run('native:polygonstolines', {
             'INPUT': input_25832,
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
+
+        boundary_buffered = processing.run('native:buffer', {
+            'INPUT': boundary_line,
             'DISTANCE': buffer_dist,
             'SEGMENTS': 5,
-            'DISSOLVE': True,
+            'DISSOLVE': False,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
@@ -83,9 +89,9 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 2. Opret grid over input-polygonens udstrækning
-        grid = processing.run('qgis:creategrid', {
-            'TYPE': 2,
+        # 2. Opret fishnet af linjer over projektgrænsens udstrækning
+        grid_lines = processing.run('qgis:creategrid', {
+            'TYPE': 1,  # Linjer
             'EXTENT': input_25832,
             'HSPACING': cell_width,
             'VSPACING': cell_height,
@@ -97,9 +103,9 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 3. Klip grid til input-polygonen (behold kun celler inden for projektgrænsen)
+        # 3. Klip gridlinjer til projektgrænsen
         grid_clipped = processing.run('native:clip', {
-            'INPUT': grid,
+            'INPUT': grid_lines,
             'OVERLAY': input_25832,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
@@ -108,7 +114,7 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 4. Buffer hver grid-celle individuelt (dissolve=False → individuelle features)
+        # 4. Buffer de klippede gridlinjer → smalle strips langs linjerne
         grid_buffered = processing.run('native:buffer', {
             'INPUT': grid_clipped,
             'DISTANCE': buffer_dist,
@@ -121,9 +127,9 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 5. Merge: bufferet projektgrænse + individuelle bufferede grid-celler
+        # 5. Merge: bufferet projektgrænse + bufferede gridlinjer
         merged = processing.run('native:mergevectorlayers', {
-            'LAYERS': [proj_buffered, grid_buffered],
+            'LAYERS': [boundary_buffered, grid_buffered],
             'CRS': crs,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
@@ -132,7 +138,7 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 6. Opdel eventuelle multipart-geometrier til single parts
+        # 6. Opdel multipart til single parts
         result_id = processing.run('native:multiparttosingleparts', {
             'INPUT': merged,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
