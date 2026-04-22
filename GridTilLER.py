@@ -8,7 +8,7 @@ from qgis.core import (
     QgsProcessing,
     QgsWkbTypes,
 )
-from qgis import processing
+import processing
 
 
 class GridTilLER(QgsProcessingAlgorithm):
