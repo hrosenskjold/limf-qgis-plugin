@@ -4,6 +4,7 @@ from qgis.core import (
     QgsProcessingParameterFeatureSource,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterNumber,
+    QgsProcessingMultiStepFeedback,
     QgsCoordinateReferenceSystem,
     QgsProcessing,
     QgsWkbTypes,
@@ -50,22 +51,23 @@ class GridTilLER(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterFeatureSink(
             self.OUTPUT, 'Til LER søgning'))
 
-    def processAlgorithm(self, parameters, context, feedback):
+    def processAlgorithm(self, parameters, context, model_feedback):
+        feedback = QgsProcessingMultiStepFeedback(7, model_feedback)
         cell_width = self.parameterAsDouble(parameters, self.CELL_WIDTH, context)
         cell_height = self.parameterAsDouble(parameters, self.CELL_HEIGHT, context)
         buffer_dist = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
         crs = QgsCoordinateReferenceSystem('EPSG:25832')
 
-        feedback.setProgressText('Reprojecterer inputlag til EPSG:25832...')
-
-        # Reprojectér input til EPSG:25832 så buffer-afstand altid er i meter
+        # 0. Reprojectér input til EPSG:25832 så alle afstande er i meter
         input_25832 = processing.run('native:reprojectlayer', {
             'INPUT': parameters[self.INPUT],
             'TARGET_CRS': crs,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        feedback.setProgressText('Opretter grid...')
+        feedback.setCurrentStep(1)
+        if feedback.isCanceled():
+            return {}
 
         # 1. Opret grid over projektgrænse
         grid = processing.run('qgis:creategrid', {
@@ -74,27 +76,36 @@ class GridTilLER(QgsProcessingAlgorithm):
             'HSPACING': cell_width,
             'VSPACING': cell_height,
             'CRS': crs,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        feedback.setProgressText('Bufferer projektgrænse (ydersiden)...')
+        feedback.setCurrentStep(2)
+        if feedback.isCanceled():
+            return {}
 
-        # 2. Buffer projektgrænse fuldt, fratræk original → kun ydre ring (svarende til OUTSIDE_ONLY)
+        # 2. Buffer projektgrænse fuldt
         proj_buffered = processing.run('native:buffer', {
             'INPUT': input_25832,
             'DISTANCE': buffer_dist,
             'SEGMENTS': 5,
             'DISSOLVE': True,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
+        feedback.setCurrentStep(3)
+        if feedback.isCanceled():
+            return {}
+
+        # Fratræk original → kun ydre ring (svarende til OUTSIDE_ONLY)
         proj_outer = processing.run('native:difference', {
             'INPUT': proj_buffered,
             'OVERLAY': input_25832,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        feedback.setProgressText('Bufferer grid og klip til projektgrænse...')
+        feedback.setCurrentStep(4)
+        if feedback.isCanceled():
+            return {}
 
         # 3. Buffer grid, dissolve alt til ét polygon
         grid_buffered = processing.run('native:buffer', {
@@ -102,30 +113,40 @@ class GridTilLER(QgsProcessingAlgorithm):
             'DISTANCE': buffer_dist,
             'SEGMENTS': 5,
             'DISSOLVE': True,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
+
+        feedback.setCurrentStep(5)
+        if feedback.isCanceled():
+            return {}
 
         # 4. Klip grid-buffer til projektgrænse
         grid_clipped = processing.run('native:clip', {
             'INPUT': grid_buffered,
             'OVERLAY': input_25832,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        feedback.setProgressText('Merger lag og oprydder geometrier...')
+        feedback.setCurrentStep(6)
+        if feedback.isCanceled():
+            return {}
 
         # 5. Merge ydre ring + klippet grid
         merged = processing.run('native:mergevectorlayers', {
             'LAYERS': [proj_outer, grid_clipped],
             'CRS': crs,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
-        # 6. Opdel multipart til single parts (svarende til ArcGIS Dissolve by OBJECTID + SINGLE_PART)
+        feedback.setCurrentStep(7)
+        if feedback.isCanceled():
+            return {}
+
+        # 6. Opdel multipart til single parts
         result = processing.run('native:multiparttosingleparts', {
             'INPUT': merged,
-            'OUTPUT': 'memory:'
-        }, context=context, feedback=feedback)['OUTPUT']
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
         (sink, dest_id) = self.parameterAsSink(
             parameters, self.OUTPUT, context,
