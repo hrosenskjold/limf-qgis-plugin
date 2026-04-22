@@ -6,7 +6,7 @@
 name=Limfjordssekretariatet tools v.4.0.1
 qgisMinimumVersion=3.0
 description=Limfjordssekretariatet forskellige tools
-version=4.0.1
+version=4.0.1.1
 author=Henrik Rosenskjold, Limfjordssekretariatet
 email=henrik.rosenskjold@aalborg.dk
 

@@ -38,7 +38,8 @@ class Limfjordssekretariatet_toolsDialog(QtWidgets.QDialog, FORM_CLASS):
         self.AfvandingsanalyseBtn.clicked.connect(self.koer_afvandingsanalyse)
         self.VASPBtn.clicked.connect(self.koer_vasp_excel)
         self.BurnBtn.clicked.connect(self.koer_fra_mike_til_dhm)   
-        self.JordbalanceBtn.clicked.connect(self.jordberegning)   
+        self.JordbalanceBtn.clicked.connect(self.jordberegning)
+        self.GridTilLERBtn.clicked.connect(self.grid_til_ler)
 
 
     def koer_afvandingsanalyse(self):
@@ -77,6 +78,11 @@ class Limfjordssekretariatet_toolsDialog(QtWidgets.QDialog, FORM_CLASS):
                 "Fejl i FraMikeTilDHM",
                 f"Der opstod en fejl under kørsel af FraMikeTilDHM:\n{e}"
             )
+
+    def grid_til_ler(self):
+        from .GridTilLER import GridTilLER
+        alg = GridTilLER()
+        processing.execAlgorithmDialog(alg)
 
     def jordberegning(self):
         """Åbner QGIS' standard parameterdialog for jordbalance-modellen."""
