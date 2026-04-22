@@ -53,7 +53,7 @@ class GridTilLER(QgsProcessingAlgorithm):
             self.OUTPUT, 'Til LER søgning'))
 
     def processAlgorithm(self, parameters, context, model_feedback):
-        feedback = QgsProcessingMultiStepFeedback(8, model_feedback)
+        feedback = QgsProcessingMultiStepFeedback(7, model_feedback)
         cell_width = self.parameterAsDouble(parameters, self.CELL_WIDTH, context)
         cell_height = self.parameterAsDouble(parameters, self.CELL_HEIGHT, context)
         buffer_dist = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context) / 2
@@ -146,18 +146,8 @@ class GridTilLER(QgsProcessingAlgorithm):
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
         feedback.setCurrentStep(7)
-        if feedback.isCanceled():
-            return {}
 
-        # 7. Opdel multipart til single parts
-        result_id = processing.run('native:multiparttosingleparts', {
-            'INPUT': dissolved,
-            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
-        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
-
-        feedback.setCurrentStep(8)
-
-        result = QgsProcessingUtils.mapLayerFromString(result_id, context)
+        result = QgsProcessingUtils.mapLayerFromString(dissolved, context)
 
         (sink, dest_id) = self.parameterAsSink(
             parameters, self.OUTPUT, context,
