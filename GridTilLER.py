@@ -53,10 +53,10 @@ class GridTilLER(QgsProcessingAlgorithm):
             self.OUTPUT, 'Til LER søgning'))
 
     def processAlgorithm(self, parameters, context, model_feedback):
-        feedback = QgsProcessingMultiStepFeedback(7, model_feedback)
+        feedback = QgsProcessingMultiStepFeedback(8, model_feedback)
         cell_width = self.parameterAsDouble(parameters, self.CELL_WIDTH, context)
         cell_height = self.parameterAsDouble(parameters, self.CELL_HEIGHT, context)
-        buffer_dist = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context)
+        buffer_dist = self.parameterAsDouble(parameters, self.BUFFER_DISTANCE, context) / 2
         crs = QgsCoordinateReferenceSystem('EPSG:25832')
 
         # 0. Reprojectér input til EPSG:25832
@@ -138,13 +138,24 @@ class GridTilLER(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 6. Opdel multipart til single parts
-        result_id = processing.run('native:multiparttosingleparts', {
+        # 6. Dissolve til ét samlet polygon
+        dissolved = processing.run('native:dissolve', {
             'INPUT': merged,
+            'FIELD': [],
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
 
         feedback.setCurrentStep(7)
+        if feedback.isCanceled():
+            return {}
+
+        # 7. Opdel multipart til single parts
+        result_id = processing.run('native:multiparttosingleparts', {
+            'INPUT': dissolved,
+            'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
+        }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
+
+        feedback.setCurrentStep(8)
 
         result = QgsProcessingUtils.mapLayerFromString(result_id, context)
 
