@@ -143,10 +143,13 @@ class GridTilLER(QgsProcessingAlgorithm):
             return {}
 
         # 6. Opdel multipart til single parts
-        result = processing.run('native:multiparttosingleparts', {
+        result_id = processing.run('native:multiparttosingleparts', {
             'INPUT': merged,
             'OUTPUT': QgsProcessing.TEMPORARY_OUTPUT
         }, context=context, feedback=feedback, is_child_algorithm=True)['OUTPUT']
+
+        from qgis.core import QgsProcessingUtils
+        result = QgsProcessingUtils.mapLayerFromString(result_id, context)
 
         (sink, dest_id) = self.parameterAsSink(
             parameters, self.OUTPUT, context,
