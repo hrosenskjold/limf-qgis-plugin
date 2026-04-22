@@ -40,11 +40,11 @@ class GridTilLER(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterNumber(
             self.CELL_WIDTH, 'Cellebredde (meter)',
             type=QgsProcessingParameterNumber.Double,
-            defaultValue=500.0))
+            defaultValue=100.0))
         self.addParameter(QgsProcessingParameterNumber(
             self.CELL_HEIGHT, 'Cellehøjde (meter)',
             type=QgsProcessingParameterNumber.Double,
-            defaultValue=500.0))
+            defaultValue=100.0))
         self.addParameter(QgsProcessingParameterNumber(
             self.BUFFER_DISTANCE, 'Bufferafstand (meter)',
             type=QgsProcessingParameterNumber.Double,
